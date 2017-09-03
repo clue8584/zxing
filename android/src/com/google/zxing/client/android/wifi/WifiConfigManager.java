@@ -17,6 +17,7 @@
 package com.google.zxing.client.android.wifi;
 
 import android.net.wifi.WifiConfiguration;
+import android.net.wifi.WifiEnterpriseConfig;
 import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
 import android.util.Log;
@@ -28,6 +29,7 @@ import com.google.zxing.client.result.WifiParsedResult;
 /**
  * @author Vikram Aggarwal
  * @author Sean Owen
+ * @author Steffen Kieß
  */
 public final class WifiConfigManager extends AsyncTask<WifiParsedResult,Object,Object> {
 
@@ -88,6 +90,9 @@ public final class WifiConfigManager extends AsyncTask<WifiParsedResult,Object,O
             break;
           case WPA:
             changeNetworkWPA(wifiManager, theWifiResult);
+            break;
+          case WPA2_EAP:
+            changeNetworkWPA2EAP(wifiManager, theWifiResult);
             break;
         }
       }
@@ -164,6 +169,26 @@ public final class WifiConfigManager extends AsyncTask<WifiParsedResult,Object,O
     updateNetwork(wifiManager, config);
   }
 
+  // Adding a WPA2 enterprise (EAP) network
+  private static void changeNetworkWPA2EAP(WifiManager wifiManager, WifiParsedResult wifiResult) {
+    WifiConfiguration config = changeNetworkCommon(wifiResult);
+    // Hex passwords that are 64 bits long are not to be quoted.
+    config.preSharedKey = quoteNonHex(wifiResult.getPassword(), 64);
+    config.allowedAuthAlgorithms.set(WifiConfiguration.AuthAlgorithm.OPEN);
+    config.allowedProtocols.set(WifiConfiguration.Protocol.RSN); // For WPA2
+    config.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.WPA_EAP);
+    config.allowedPairwiseCiphers.set(WifiConfiguration.PairwiseCipher.TKIP);
+    config.allowedPairwiseCiphers.set(WifiConfiguration.PairwiseCipher.CCMP);
+    config.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.TKIP);
+    config.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.CCMP);
+    config.enterpriseConfig.setIdentity(wifiResult.getIdentity());
+    config.enterpriseConfig.setAnonymousIdentity(wifiResult.getAnonymousIdentity());
+    config.enterpriseConfig.setPassword(wifiResult.getPassword());
+    config.enterpriseConfig.setEapMethod(parseEap(wifiResult.getEapMethod()));
+    config.enterpriseConfig.setPhase2Method(parsePhase2(wifiResult.getPhase2Method()));
+    updateNetwork(wifiManager, config);
+  }
+
   // Adding an open, unsecured network
   private static void changeNetworkUnEncrypted(WifiManager wifiManager, WifiParsedResult wifiResult) {
     WifiConfiguration config = changeNetworkCommon(wifiResult);
@@ -224,6 +249,32 @@ public final class WifiConfigManager extends AsyncTask<WifiParsedResult,Object,O
       }
     }
     return false;
+  }
+
+  private static int parseEap(String eapString) {
+    if (eapString == null) {
+      return WifiEnterpriseConfig.Eap.NONE;
+    }
+    try {
+      return (Integer) WifiEnterpriseConfig.Eap.class.getField(eapString).get(null);
+    } catch (NoSuchFieldException e) {
+      throw new IllegalArgumentException("Unable to find WifiEnterpriseConfig.Eap value for " + eapString);
+    } catch (IllegalAccessException e) {
+      throw new IllegalArgumentException("Unable to parse Eap parameter " + eapString, e);
+    }
+  }
+
+  private static int parsePhase2(String phase2String) {
+    if (phase2String == null) {
+      return WifiEnterpriseConfig.Phase2.NONE;
+    }
+    try {
+      return (Integer) WifiEnterpriseConfig.Phase2.class.getField(phase2String).get(null);
+    } catch (NoSuchFieldException e) {
+      throw new IllegalArgumentException("Unable to find WifiEnterpriseConfig.Phase2 value for " + phase2String);
+    } catch (IllegalAccessException e) {
+      throw new IllegalArgumentException("Unable to parse Phase2 parameter " + phase2String, e);
+    }
   }
 
 }

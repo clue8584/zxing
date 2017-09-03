@@ -23,10 +23,17 @@ import com.google.zxing.Result;
  *
  * <p>{@code WIFI:T:[network type];S:[network SSID];P:[network password];H:[hidden?];;}</p>
  *
+ * <p>For WPA2 enterprise (EAP), strings will be of the form:</p>
+ *
+ * <p>{@code WIFI:T:WPA2-EAP;S:[network SSID];H:[hidden?];E:[EAP method];PH2:[Phase 2 method];AI:[anonymous identity];I:[username];P:[password];;}</p>
+ *
+ * <p>"EAP method" can e.g. be "TTLS" or "PWD" or one of the other fields in <a href="https://developer.android.com/reference/android/net/wifi/WifiEnterpriseConfig.Eap.html">WifiEnterpriseConfig.Eap</a> and "Phase 2 method" can e.g. be "MSCHAPV2" or any of the other fields in <a href="https://developer.android.com/reference/android/net/wifi/WifiEnterpriseConfig.Phase2.html">WifiEnterpriseConfig.Phase2</a></p>
+ *
  * <p>The fields can appear in any order. Only "S:" is required.</p>
  *
  * @author Vikram Aggarwal
  * @author Sean Owen
+ * @author Steffen Kieß
  */
 public final class WifiResultParser extends ResultParser {
 
@@ -36,16 +43,21 @@ public final class WifiResultParser extends ResultParser {
     if (!rawText.startsWith("WIFI:")) {
       return null;
     }
-    String ssid = matchSinglePrefixedField("S:", rawText, ';', false);
+    rawText = ";" + rawText.substring("WIFI:".length());
+    String ssid = matchSinglePrefixedField(";S:", rawText, ';', false);
     if (ssid == null || ssid.isEmpty()) {
       return null;
     }
-    String pass = matchSinglePrefixedField("P:", rawText, ';', false);
-    String type = matchSinglePrefixedField("T:", rawText, ';', false);
+    String pass = matchSinglePrefixedField(";P:", rawText, ';', false);
+    String type = matchSinglePrefixedField(";T:", rawText, ';', false);
     if (type == null) {
       type = "nopass";
     }
-    boolean hidden = Boolean.parseBoolean(matchSinglePrefixedField("H:", rawText, ';', false));
-    return new WifiParsedResult(type, ssid, pass, hidden);
+    boolean hidden = Boolean.parseBoolean(matchSinglePrefixedField(";H:", rawText, ';', false));
+    String identity = matchSinglePrefixedField(";I:", rawText, ';', false);
+    String anonymousIdentity = matchSinglePrefixedField(";AI:", rawText, ';', false);
+    String eapMethod = matchSinglePrefixedField(";E:", rawText, ';', false);
+    String phase2Method = matchSinglePrefixedField(";PH2:", rawText, ';', false);
+    return new WifiParsedResult(type, ssid, pass, hidden, identity, anonymousIdentity, eapMethod, phase2Method);
   }
 }
